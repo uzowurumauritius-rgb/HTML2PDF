@@ -40,7 +40,7 @@ print("=== HTML to PDF Converter (Terminal + File Dialogs) ===\n")
 # The 'r' creates a raw string - backslashes are treated as literal characters
 # This path is hardcoded because wkhtmltopdf is installed once and doesn't change
 # Change this path if your wkhtmltopdf is installed in a different location
-html2pdf_tool_path = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+html2pdf_tool_path = r"/usr/local/bin/wkhtmltopdf"
 
 # Verify the hardcoded path is valid
 if not Path(html2pdf_tool_path).exists():

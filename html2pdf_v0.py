@@ -5,7 +5,7 @@ import pdfkit
 # =============================
 # POINT TO THE ACTUAL EXE FILE (not the folder)
 # =============================
-html2pdf_tool_path = r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+html2pdf_tool_path = r"/usr/local/bin/wkhtmltopdf"
 
 
 
