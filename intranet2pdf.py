@@ -39,13 +39,13 @@ from selenium.common.exceptions import (
 
 
 # ================================================================
-# CONSTANTS — INTRANET SPECIFIC SETTINGS
+# ENV VAR CONSTANTS — INTRANET SPECIFIC SETTINGS,
 # ================================================================
 
-# Keywords that identify a login/auth page in the URL
+# Keywords that identify the login/auth page in the URL
 LOGIN_URL_KEYWORDS = ["sign_in", "login", "auth"]
 
-# Path to the Chromium browser binary on Kali Linux
+# Path to the Chromium browser binary on Linux
 CHROMIUM_PATH = "/usr/bin/chromium"
 
 # How long (in seconds) to wait for elements and page loads
@@ -80,77 +80,165 @@ WAIT_TIMEOUT = 20
 # FILL IN YOUR INSPECTED VALUES BELOW:
 # ----------------------------------------------------------------
 
-# Inspect the EMAIL input field and fill in what you find:
-# e.g. if you see id="user_email"  → set to: (By.ID, "user_email")
-# e.g. if you see name="email"     → set to: (By.NAME, "email")
-SELECTOR_EMAIL = (By.CSS_SELECTOR, "input[type='email']")   # ← REPLACE IF NEEDED
+# INSPECTED: <input id="user_email" name="user[email]" type="email" ...>
+# Using By.ID — most reliable selector since id is unique on the page
+SELECTOR_EMAIL = (By.ID, "user_email")
 
-# Inspect the PASSWORD input field and fill in what you find:
-# e.g. if you see id="user_password" → set to: (By.ID, "user_password")
-SELECTOR_PASSWORD = (By.CSS_SELECTOR, "input[type='password']")  # ← REPLACE IF NEEDED
+# INSPECTED: <input id="user_password" name="user[password]" type="password" ...>
+# Using By.ID — most reliable selector since id is unique on the page
+SELECTOR_PASSWORD = (By.ID, "user_password")
 
-# Inspect the LOGIN BUTTON and fill in what you find:
-# e.g. if you see id="submit"              → set to: (By.ID, "submit")
-# e.g. if you see type="submit"            → set to: (By.CSS_SELECTOR, "input[type='submit']")
-# e.g. if the button says "Log in"         → set to: (By.XPATH, "//button[text()='Log in']")
-SELECTOR_SUBMIT = (By.CSS_SELECTOR, "input[type='submit'], button[type='submit']")  # ← REPLACE IF NEEDED
+# INSPECTED: <input type="submit" name="commit" value="Log in" class="btn btn-primary" ...>
+# No id present — using value attribute since it's specific to this button
+SELECTOR_SUBMIT = (By.CSS_SELECTOR, "input[value='Log in']")
+
+
 
 # ================================================================
 # ⚠️  LOGIN SUCCESS DETECTION — INSPECT THIS TOO
 # ================================================================
-# After clicking login, how do we know it WORKED vs FAILED?
-#
-# Option A — Check the URL changed away from the login page
-#             (this is the default — already handled by is_login_page())
-#
-# Option B — Look for an error message element that appears on bad credentials
-#   Right-click the red error message → Inspect → note its id, class, or tag
-#   e.g. <div class="alert alert-danger">Invalid email or password</div>
-#   Then set: ERROR_SELECTOR = (By.CSS_SELECTOR, ".alert.alert-danger")
-#
-# FILL IN IF YOU FIND AN ERROR MESSAGE ELEMENT:
-ERROR_SELECTOR = None   # ← SET TO e.g. (By.CSS_SELECTOR, ".alert") IF YOU FIND ONE
+# INSPECTED: <div class="alert alert-danger sm-gap big-zindex">Invalid email or password</div>
+# Using .alert.alert-danger — the two most specific classes, ignoring sm-gap and big-zindex
+# which are likely just styling/positioning classes that could change
+ERROR_SELECTOR = (By.CSS_SELECTOR, ".alert.alert-danger")
 
 
 # ================================================================
 # HIDE THE MAIN TKINTER WINDOW
 # ================================================================
 
+# Create an instance of the Tk class (this is the main window)
+# Tkinter always creates this when it starts, even if we don't want it
 root = Tk()
+
+# Call the withdraw() method to hide the main window from view
+# The window still exists in memory but is invisible to the user
 root.withdraw()
+
+# Call the attributes() method with '-topmost' to set window behavior
+# Setting '-topmost' to True forces the dialog windows to appear
+# on top of all other applications so the user doesn't lose them
 root.attributes('-topmost', True)
 
 
 # ================================================================
-# HELPER — CLEAN EXIT
+# HELPER FUNCTION 1 — CLEAN EXIT
 # ================================================================
 
 def clean_exit(message=None):
-    """Print an optional message, destroy tkinter, and exit cleanly."""
+    # clean_exit() is a reusable shutdown function that safely stops the program
+    # from anywhere in the script — whether something went wrong or the user cancelled.
+    #
+    # It always does three things in order:
+    #   1. Print a message to the terminal (if one was passed in)
+    #   2. Destroy the hidden tkinter window to free memory
+    #   3. Exit the Python program completely
+    #
+    # WHY DO WE NEED THIS?
+    # Without it, if we just called sys.exit() directly, the hidden tkinter window
+    # would stay alive in memory. And if we just called root.destroy() without
+    # sys.exit(), the program would keep running past the point we wanted it to stop.
+    # clean_exit() wraps both into one safe call.
+    #
+    # THE message=None PARAMETER:
+    # message=None means the argument is optional — the caller can pass a message
+    # or nothing at all. If a message is passed (e.g. "❌ No URL entered. Exiting.")
+    # it gets printed to the terminal before shutdown. If nothing is passed, the
+    # function skips the print and just shuts down silently.
+    #
+    # WHY try/except AROUND root.destroy()?
+    # If root.destroy() has already been called earlier (e.g. tkinter already cleaned
+    # up), calling it again would throw an error and crash the exit itself — which
+    # would be ironic. The try/except silently ignores that edge case with pass,
+    # and lets sys.exit() run regardless.
+
     if message:
         print(message)
+
     try:
-        root.destroy()
+        root.destroy()  # Close the hidden tkinter window and free its memory
     except Exception:
-        pass
-    sys.exit()
+        pass            # Tkinter was already destroyed — safe to ignore and move on
+
+    sys.exit()          # Terminate the Python program immediately and cleanly
 
 
 # ================================================================
-# HELPER — SET UP SELENIUM CHROMIUM DRIVER
+# HELPER FUNCTION 2 — SET UP SELENIUM CHROMIUM DRIVER
 # ================================================================
 
 def create_driver():
     """
-    Configures and returns a Selenium Chrome WebDriver instance.
+    Configures and returns a Selenium Chrome WebDriver instance 
+    "with the 'Options()' class from 'selenium.webdriver.chrome.options'.
     Uses Selenium Manager (built into Selenium 4.6+) to automatically
     download the correct chromedriver — no manual install needed.
     """
-    chrome_options = Options()
 
+
+    chrome_options = Options() 
+
+    # ----------------
+    # Defining Options
+    # ----------------
     # ---- Headless & Sandbox ----
     chrome_options.add_argument("--headless=new")        # No visible browser window
-    chrome_options.add_argument("--no-sandbox")          # Required on Kali / root
+
+
+
+    # -----------------------------------------------------
+    # WHAT IS A SANDBOX?
+
+    # Normally when Chromium runs, it wraps itself in a 
+    # sandbox — an OS-level security wall that isolates 
+    # the browser from the rest of your system. 
+    # Think of it like this:
+
+    # WITHOUT sandbox:                  WITH sandbox (normal):
+    # ┌─────────────────┐               ┌─────────────────┐
+    # │   Your System   │               │   Your System   │
+    # │                 │               │  ┌───────────┐  │
+    # │    Chromium     │               │  │  SANDBOX  │  │
+    # │  (full access)  │               │  │ Chromium  │  │
+    # │                 │               │  │(isolated) │  │
+    # └─────────────────┘               │  └───────────┘  │
+    #                                   └─────────────────┘
+
+    # The sandbox stops a malicious webpage from breaking out 
+    # of the browser and touching your files, processes, or system,
+    
+
+    # WHY DOES IT BREAK ON KALI / AS ROOT?
+
+    # The sandbox works by creating a restricted child process with 
+    # lower privileges than the parent. The OS enforces this.
+    # The problem is — if you are already running as root, you are 
+    # already at the highest privilege level. The OS cannot create 
+    # a process with lower privileges than root, so the sandbox 
+    # mechanism fails entirely and Chromium refuses to start.
+    # Kali Linux by default logs you in as root, which is why this
+    # error always comes up on Kali specifically.
+    # -------------------------------------------------------------
+
+    # WHAT --no-sandbox DOES?
+
+    # it simply tells chromium:
+    # "skip the sandbox — don't try to create that restricted wrapper process."
+    # So Chromium can launch when running as root.
+    # Safe here because we control exactly
+    # what URLs the browser visits —
+    # we are not browsing the open web freely.                               
+
+    chrome_options.add_argument("--no-sandbox") 
+
+    # -----------------------------------------------------------------------
+    # /dev/shm is a small shared memory partition on Linux that Chromium uses
+    # by default to store temporary rendering data. On many Linux systems — 
+    # especially containers and Kali — this partition is too small for 
+    # Chromium's needs, causing it to crash mid-render.
+    # --disable-dev-shm-usage tells Chromium to use the regular /tmp folder 
+    # instead, which has no such size restriction.
+    # ------------------------------------------------------------------------  
     chrome_options.add_argument("--disable-dev-shm-usage")  # Prevent shared memory issues
 
     # ---- Display & Rendering ----
